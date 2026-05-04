@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>স্বাধীন বাজার (Shadhin Bazar) - খাঁটি এবং অর্গানিক খাদ্য</title>
+    <meta name="description" content="স্বাধীন বাজার - আপনার জন্য নিয়ে এসেছে সেরা মানের খাঁটি ও অর্গানিক খাদ্যপণ্য। মধু, ঘি, তেল এবং আরও অনেক কিছু।" />
+    <meta name="keywords" content="অর্গানিক ফুড, খাঁটি খাবার, স্বাধীন বাজার, Shadhin Bazar, Organic Food Bangladesh, Honey, Ghee, Pure Oil" />
+    <meta property="og:title" content="স্বাধীন বাজার - খাঁটি এবং অর্গানিক খাদ্য" />
+    <meta property="og:description" content="সেরা মানের খাঁটি ও অর্গানিক খাদ্যপণ্যের বিশ্বস্ত প্রতিষ্ঠান।" />
+    <meta property="og:type" content="website" />
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
+    <!-- Fix for read-only fetch in some iframe environments -->
+    <script>
+      (function() {
+        try {
+          var descriptor = Object.getOwnPropertyDescriptor(window, 'fetch');
+          if (descriptor && !descriptor.writable && descriptor.configurable) {
+            var originalFetch = window.fetch;
+            Object.defineProperty(window, 'fetch', {
+              value: originalFetch,
+              writable: true,
+              configurable: true,
+              enumerable: true
+            });
+          }
+        } catch (e) {
+          console.warn('Unable to patch window.fetch:', e);
+        }
+      })();
+    </script>
+    <!-- Meta Pixel Code -->
+    <script>
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      try {
+        s.parentNode.insertBefore(t,s);
+      } catch (e) {
+        console.error('Meta Pixel load failed:', e);
+      }
+      }(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '2497566477328649');
+      fbq('track', 'PageView');
+    </script>
+    <!-- End Meta Pixel Code -->
+  </head>
+  <body>
+    <!-- Meta Pixel noscript -->
+    <noscript>
+      <img height="1" width="1" style="display:none"
+           src="https://www.facebook.com/tr?id=2497566477328649&ev=PageView&noscript=1"/>
+    </noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

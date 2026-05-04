@@ -1,0 +1,6 @@
+{
+  "name": "Shadhin Bazar - Pure Organic Food",
+  "description": "Premium organic and farmer-sourced food products from Bangladesh.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": []
+}

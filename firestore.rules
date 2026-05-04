@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == "nuruddinfahad86@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Product validation
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'price', 'image']) &&
+             data.name is string && data.name.size() <= 200 &&
+             data.price is number &&
+             data.image is string && data.image.size() <= 1000000 && // Up to 1MB supported
+             (!('description' in data) || (data.description is string && data.description.size() <= 5000)) &&
+             (!('originalPrice' in data) || (data.originalPrice is number)) &&
+             (!('category' in data) || (data.category is string)) &&
+             (!('stock' in data) || (data.stock is bool)) &&
+             (!('images' in data) || (data.images is list && data.images.size() <= 6)) &&
+             (!('createdAt' in data) || (data.createdAt == request.time || data.createdAt is timestamp)) &&
+             (!('updatedAt' in data) || (data.updatedAt == request.time || data.updatedAt is timestamp));
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll(['userId', 'userName', 'rating', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.userName is string && data.userName.size() <= 100 &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             (!('comment' in data) || (data.comment is string && data.comment.size() <= 1000)) &&
+             data.createdAt == request.time;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['name', 'phone', 'address', 'paymentMethod', 'items', 'subtotal', 'totalAmount', 'status', 'createdAt']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.phone is string && data.phone.size() <= 20 &&
+             data.address is string && data.address.size() <= 500 &&
+             data.paymentMethod in ['bkash', 'nagad', 'cod'] &&
+             (!('transactionId' in data) || (data.transactionId is string && data.transactionId.size() <= 100)) &&
+             data.items is list && data.items.size() > 0 &&
+             data.subtotal is number &&
+             data.totalAmount is number &&
+             data.status in ['pending', 'completed', 'cancelled'] &&
+             (!('userId' in data) || (data.userId == null || data.userId is string)) &&
+             (!('discountAmount' in data) || (data.discountAmount is number)) &&
+             (!('couponCode' in data) || (data.couponCode == null || data.couponCode is string)) &&
+             data.createdAt == request.time;
+    }
+
+    function isValidCoupon(data, isUpdate) {
+      return data.keys().hasAll(['code', 'type', 'value', 'active']) &&
+             data.code is string && data.code.size() <= 20 &&
+             data.type in ['fixed', 'percent'] &&
+             data.value is number &&
+             data.active is bool &&
+             (isUpdate ? 
+               (data.createdAt is timestamp && data.updatedAt == request.time) : 
+               (data.createdAt == request.time)
+             );
+    }
+
+    function isValidSettings(data) {
+      return data.keys().hasAll(['logo', 'heroImages', 'heroTitle', 'heroSubtitle', 'heroBadge']) &&
+             data.logo is string && data.logo.size() <= 1000000 &&
+             data.heroImages is list && data.heroImages.size() <= 10 &&
+             data.heroTitle is string && data.heroTitle.size() <= 1000 &&
+             data.heroSubtitle is string && data.heroSubtitle.size() <= 5000 &&
+             data.heroBadge is string && data.heroBadge.size() <= 200;
+    }
+
+    // Products collection
+    match /products/{productId} {
+      allow read: if true; // Publicly readable
+      allow create: if isAdmin() && isValidProduct(request.resource.data);
+      allow update: if isAdmin() && isValidProduct(request.resource.data);
+      allow delete: if isAdmin();
+
+      // Reviews subcollection
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if isSignedIn() && isValidReview(request.resource.data);
+        allow update: if isSignedIn() && request.auth.uid == resource.data.userId && isValidReview(request.resource.data);
+        allow delete: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+      }
+    }
+
+    // Orders collection
+    match /orders/{orderId} {
+      allow create: if isValidOrder(request.resource.data);
+      allow read: if isAdmin() || (isSignedIn() && (resource == null || resource.data.userId == request.auth.uid));
+      allow update, delete: if isAdmin();
+    }
+
+    // Coupons collection
+    match /coupons/{couponId} {
+      // Allow public queries to validate active coupons
+      allow read: if true; 
+      allow create: if isAdmin() && isValidCoupon(request.resource.data, false);
+      allow update: if isAdmin() && 
+                    request.resource.data.createdAt == resource.data.createdAt &&
+                    isValidCoupon(request.resource.data, true);
+      allow delete: if isAdmin();
+    }
+
+    // Settings collection
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidSettings(request.resource.data);
+    }
+
+    // Admins collection (Read-only by owner, write-only by system/manual step)
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && request.auth.uid == adminId;
+      allow write: if false; // Only manageable via Firebase console to prevent self-enrollment
+    }
+  }
+}

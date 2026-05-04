@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "product": {
+      "title": "Product",
+      "description": "An organic food product sold by Shadhin Bazar",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the product" },
+        "description": { "type": "string", "description": "Short description" },
+        "price": { "type": "number", "description": "Current price in BDT" },
+        "originalPrice": { "type": "number", "description": "Original price if discounted" },
+        "image": { "type": "string", "format": "uri", "description": "URL of the product image" },
+        "images": { "type": "array", "items": { "type": "string" }, "description": "Additional product images" },
+        "category": { "type": "string", "description": "Product category" },
+        "stock": { "type": "boolean", "description": "Availability status" },
+        "certifications": { "type": "array", "items": { "type": "string" }, "description": "Organic certifications (e.g., USDA Organic, EU Organic)" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price", "image"]
+    },
+    "admin": {
+      "title": "Admin",
+      "description": "System administrator with management access",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "uid": { "type": "string" }
+      },
+      "required": ["email", "uid"]
+    },
+    "review": {
+      "title": "Review",
+      "description": "A user review for a product",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the reviewer" },
+        "userName": { "type": "string", "description": "Name of the reviewer" },
+        "rating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "comment": { "type": "string", "description": "Review text" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "rating", "createdAt"]
+    },
+    "order": {
+      "title": "Order",
+      "description": "A product order placed by a customer",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "paymentMethod": { "type": "string", "enum": ["bkash", "nagad", "cod"] },
+        "transactionId": { "type": "string" },
+        "items": { 
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" },
+              "quantity": { "type": "number" }
+            }
+          }
+        },
+        "subtotal": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone", "address", "paymentMethod", "items", "subtotal", "totalAmount", "status", "createdAt"]
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Global site settings",
+      "type": "object",
+      "properties": {
+        "logo": { "type": "string" },
+        "heroImages": { "type": "array", "items": { "type": "string" } },
+        "heroTitle": { "type": "string" },
+        "heroSubtitle": { "type": "string" },
+        "heroBadge": { "type": "string" }
+      },
+      "required": ["logo", "heroImages", "heroTitle", "heroSubtitle", "heroBadge"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "product",
+      "description": "Collection of products"
+    },
+    "/products/{productId}/reviews/{reviewId}": {
+      "schema": "review",
+      "description": "Subcollection of reviews for a specific product"
+    },
+    "/orders/{orderId}": {
+      "schema": "order",
+      "description": "Collection of orders"
+    },
+    "/settings/{settingId}": {
+      "schema": "settings",
+      "description": "Site-wide configuration"
+    },
+    "/admins/{adminId}": {
+      "schema": "admin",
+      "description": "Whitelist of admin UIDs"
+    }
+  }
+}
