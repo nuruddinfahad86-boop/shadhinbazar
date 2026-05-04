@@ -15,17 +15,17 @@
       (function() {
         try {
           var descriptor = Object.getOwnPropertyDescriptor(window, 'fetch');
-          if (descriptor && !descriptor.writable && descriptor.configurable) {
+          if (descriptor && descriptor.configurable) {
             var originalFetch = window.fetch;
             Object.defineProperty(window, 'fetch', {
-              value: originalFetch,
+              value: function() { return originalFetch.apply(window, arguments); },
               writable: true,
               configurable: true,
               enumerable: true
             });
           }
         } catch (e) {
-          console.warn('Unable to patch window.fetch:', e);
+          console.warn('Note: window.fetch patch skipped');
         }
       })();
     </script>

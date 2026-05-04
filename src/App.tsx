@@ -444,14 +444,23 @@ export default function App() {
       setIsSavingSettings(true);
       
       // Checking for document size roughly (Firestore limit is 1MB)
-      // Use a safer way to estimate size or catch error
       let settingsSize = 0;
       try {
-        settingsSize = JSON.stringify(siteSettings).length;
+        // Calculate size of strings and arrays of strings only to avoid circularity issues
+        Object.values(siteSettings).forEach(val => {
+          if (typeof val === 'string') settingsSize += val.length;
+          else if (Array.isArray(val)) {
+            val.forEach(item => {
+              if (typeof item === 'string') settingsSize += item.length;
+            });
+          } else if (val && typeof val === 'object') {
+            // For other objects, we skip deep calculation to avoid circularity
+            settingsSize += 100; 
+          }
+        });
       } catch (e) {
-        console.warn("Circular reference in siteSettings, attempting to clean...", e);
-        // Fallback: simplified stringify or just assume it's okay for now if we can't calculate
-        settingsSize = 500000; // Fake safe size
+        console.warn("Error calculating settings size:", e);
+        settingsSize = 500000; // Safe fallback
       }
       
       if (settingsSize > 1000000) {

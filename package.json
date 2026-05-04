@@ -22,17 +22,17 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-easy-crop": "^5.5.7",
-    "sharp": "^0.34.5",
-    "svgo": "^4.0.1",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3",
-    "vite-plugin-image-optimizer": "^2.0.3"
+    "vite": "^6.2.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@types/papaparse": "^5.5.2",
     "autoprefixer": "^10.4.21",
-    "tsx": "^4.21.0"
+    "sharp": "^0.34.5",
+    "svgo": "^4.0.1",
+    "tsx": "^4.21.0",
+    "vite-plugin-image-optimizer": "^2.0.3"
   }
 }
