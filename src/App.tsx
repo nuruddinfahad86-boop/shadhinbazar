@@ -43,7 +43,9 @@ import {
   Link as LinkIcon,
   Navigation,
   PhoneCall,
-  Share2
+  Share2,
+  SlidersHorizontal,
+  Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, useCallback } from 'react';
@@ -96,6 +98,7 @@ interface Product {
   description: string;
   price: number;
   originalPrice?: number;
+  deliveryCharge?: number;
   image: string;
   images?: string[];
   category?: string;
@@ -210,6 +213,8 @@ export default function App() {
   const [showLightbox, setShowLightbox] = useState(false);
   const [activeView, setActiveView] = useState<'home' | 'products' | 'account'>('home');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
   
   // Advanced Filtering State
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
@@ -232,7 +237,12 @@ export default function App() {
     setPriceRange([0, 10000]);
     setInStockOnly(false);
     setSelectedCertifications([]);
+    setCurrentPage(1);
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, priceRange, inStockOnly, selectedCertifications]);
 
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -545,6 +555,11 @@ export default function App() {
     const total = checkingOutProduct ? checkingOutProduct.price : cartTotal;
     if (appliedCoupon.type === 'fixed') return appliedCoupon.value;
     return Math.round((total * appliedCoupon.value) / 100);
+  };
+
+  const calculateDelivery = () => {
+    if (checkingOutProduct) return checkingOutProduct.deliveryCharge || 0;
+    return cart.reduce((sum, item) => sum + ((item.deliveryCharge || 0) * item.quantity), 0);
   };
 
   const isOrganic = (category?: string) => {
@@ -1004,20 +1019,25 @@ export default function App() {
       ? [{ ...checkingOutProduct, quantity: 1 }] 
       : cart;
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const totalDeliveryCharge = calculateDelivery();
     const discount = calculateDiscount();
-    const finalAmount = subtotal - discount;
+    const finalAmount = subtotal + totalDeliveryCharge - discount;
+    const productNameSummary = items.map(i => i.name).join(', ');
 
     setIsPlacingOrder(true);
     try {
       const docRef = await addDoc(collection(db, 'orders'), {
         ...checkoutForm,
+        productName: productNameSummary,
         items: items.map(item => ({
           id: item.id,
           name: item.name,
           price: item.price,
-          quantity: item.quantity
+          quantity: item.quantity,
+          deliveryCharge: item.deliveryCharge || 0
         })),
         subtotal,
+        deliveryCharge: totalDeliveryCharge,
         discountAmount: discount,
         totalAmount: finalAmount,
         userId: user?.uid || null,
@@ -1087,6 +1107,7 @@ export default function App() {
               description: row.description?.toString() || '',
               price: Number(row.price) || 0,
               originalPrice: row.originalPrice ? Number(row.originalPrice) : null,
+              deliveryCharge: row.deliveryCharge ? Number(row.deliveryCharge) : 0,
               image: row.image?.toString() || 'https://images.unsplash.com/photo-1584362917165-526a963579e8?auto=format&fit=crop&q=80',
               category: row.category?.toString() || 'others',
               stock: (row.stock === 'true' || row.stock === '1' || row.stock === true),
@@ -1747,22 +1768,26 @@ export default function App() {
                   )}
                 </div>
 
-                {appliedCoupon && (
-                  <div className="space-y-1 pt-1 sm:pt-2">
-                    <div className="flex justify-between text-xs sm:text-sm text-slate-500">
-                      <span>সাব-টোটাল:</span>
-                      <span>৳{checkingOutProduct.price}</span>
-                    </div>
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex justify-between text-xs sm:text-sm text-slate-500">
+                    <span>সাব-টোটাল:</span>
+                    <span>৳{checkingOutProduct ? checkingOutProduct.price : cartTotal}</span>
+                  </div>
+                  <div className="flex justify-between text-xs sm:text-sm text-slate-500">
+                    <span>ডেলিভারি চার্জ:</span>
+                    <span>+ ৳{calculateDelivery()}</span>
+                  </div>
+                  {appliedCoupon && (
                     <div className="flex justify-between text-xs sm:text-sm text-red-500 font-bold">
                       <span>ডিসকাউন্ট:</span>
                       <span>- ৳{calculateDiscount()}</span>
                     </div>
-                    <div className="flex justify-between text-base sm:text-lg font-black text-forest border-t border-slate-100 pt-2 mt-1 sm:mt-2">
-                      <span>মোট দেয়:</span>
-                      <span>৳{checkingOutProduct.price - calculateDiscount()}</span>
-                    </div>
+                  )}
+                  <div className="flex justify-between text-base sm:text-lg font-black text-forest border-t border-slate-100 pt-2 mt-2">
+                    <span>মোট দেয় (সর্বমোট):</span>
+                    <span>৳{(checkingOutProduct ? checkingOutProduct.price : cartTotal) + calculateDelivery() - calculateDiscount()}</span>
                   </div>
-                )}
+                </div>
 
                 <div className="space-y-4">
                   {/* Name Input */}
@@ -2011,7 +2036,10 @@ export default function App() {
                   <div className="space-y-2 pt-4 border-t border-slate-200">
                     <div className="flex justify-between text-[11px] sm:text-xs">
                       <span className="text-slate-400 font-bold uppercase tracking-wider">টাকার পরিমাণ:</span>
-                      <span className="text-slate-900 font-bold">৳{trackingResult.totalAmount}</span>
+                      <div className="text-right">
+                        <span className="text-slate-900 font-bold block">৳{trackingResult.totalAmount}</span>
+                        <span className="text-[9px] text-slate-400 font-bold italic"> (৳{trackingResult.subtotal || 0} + ৳{trackingResult.deliveryCharge || 0} - ৳{trackingResult.discountAmount || 0})</span>
+                      </div>
                     </div>
                     <div className="flex justify-between text-[11px] sm:text-xs">
                       <span className="text-slate-400 font-bold uppercase tracking-wider">পেমেন্ট মেথড:</span>
@@ -2107,7 +2135,10 @@ export default function App() {
                             </div>
                           </div>
                           <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2 border-t sm:border-t-0 pt-2 sm:pt-0">
-                            <div className="text-base sm:text-lg font-black text-forest">৳{order.totalAmount}</div>
+                            <div className="text-right">
+                              <div className="text-base sm:text-lg font-black text-forest">৳{order.totalAmount}</div>
+                              <div className="hidden sm:block text-[9px] text-slate-400 font-bold italic"> (৳{order.subtotal || 0} + ৳{order.deliveryCharge || 0} - ৳{order.discountAmount || 0})</div>
+                            </div>
                             <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                               order.status === 'completed' ? 'bg-forest/10 text-forest' : 
                               order.status === 'cancelled' ? 'bg-red-50 text-red-500' :
@@ -2437,7 +2468,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                               <label className="block text-sm font-bold text-slate-700 mb-1">বর্তমান মূল্য (৳) *</label>
                               <input 
@@ -2455,6 +2486,15 @@ export default function App() {
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-forest outline-none"
                                 value={editingProduct.originalPrice || ''}
                                 onChange={e => setEditingProduct({...editingProduct, originalPrice: Number(e.target.value)})}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-bold text-slate-700 mb-1">ডেলিভারি চার্জ (৳)</label>
+                              <input 
+                                type="number"
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-forest outline-none"
+                                value={editingProduct.deliveryCharge || ''}
+                                onChange={e => setEditingProduct({...editingProduct, deliveryCharge: Number(e.target.value)})}
                               />
                             </div>
                           </div>
@@ -2594,7 +2634,10 @@ export default function App() {
                             </div>
                             <div className="text-right">
                               <div className="text-xl font-black text-forest">৳{order.totalAmount}</div>
-                              <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${
+                              <div className="text-[10px] text-slate-400 font-bold">
+                                (৳{order.subtotal || 0} + ৳{order.deliveryCharge || 0} - ৳{order.discountAmount || 0})
+                              </div>
+                              <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 ${
                                 order.status === 'completed' ? 'bg-forest/10 text-forest' : 
                                 order.status === 'cancelled' ? 'bg-red-50 text-red-500' :
                                 'bg-orange-50 text-orange-500'
@@ -3338,57 +3381,37 @@ export default function App() {
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Search Bar & Categories Container */}
                 <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-100 mb-12">
-                   <div className="flex flex-col gap-8">
-                      <div className="relative max-w-2xl mx-auto w-full">
-                         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                           <Search className="w-5 h-5" />
-                         </div>
-                         <input 
-                           type="text" 
-                           placeholder="পণ্যের নাম দিয়ে খুঁজুন..."
-                           className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-forest transition-all"
-                           value={searchQuery}
-                           onChange={(e) => setSearchQuery(e.target.value)}
-                         />
-                      </div>
-                      
-                      <div className="relative">
-                        <div className="flex overflow-x-auto pb-4 gap-2 md:gap-3 no-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center">
-                          {CATEGORIES.map(cat => (
-                            <button
-                              key={cat.id}
-                              onClick={() => setSelectedCategory(cat.id)}
-                              className={`px-5 md:px-6 py-2 md:py-2.5 rounded-lg md:rounded-xl font-bold transition-all whitespace-nowrap text-xs md:text-sm flex-shrink-0 ${
-                                selectedCategory === cat.id 
-                                  ? 'bg-forest text-white shadow-lg scale-105' 
-                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-transparent'
-                              }`}
-                            >
-                              {cat.name}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-white to-transparent pointer-events-none sm:hidden" />
-                      </div>
-
-                        <div className="flex flex-col items-center gap-4">
-                          <div className="flex gap-4">
-                            <button 
-                              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                              className="flex items-center gap-2 text-forest font-bold hover:underline py-2"
-                            >
-                              {showAdvancedFilters ? <X className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
-                              {showAdvancedFilters ? 'ফিল্টার বন্ধ করুন' : 'উন্নত ফিল্টার'}
-                            </button>
-                            {(searchQuery || selectedCategory !== 'all' || inStockOnly || selectedCertifications.length > 0 || priceRange[0] > 0 || priceRange[1] < 10000) && (
-                              <button 
-                                onClick={resetFilters}
-                                className="flex items-center gap-2 text-red-500 font-bold hover:underline py-2"
-                              >
-                                <RefreshCw className="w-4 h-4" /> ফিল্টার মুছুন
-                              </button>
-                            )}
+                    <div className="flex flex-col gap-6">
+                       <div className="flex items-center gap-3 max-w-2xl mx-auto w-full">
+                          <div className="relative flex-1">
+                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                               <Search className="w-5 h-5" />
+                             </div>
+                             <input 
+                               type="text" 
+                               placeholder="পণ্যের নাম দিয়ে খুঁজুন..."
+                               className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-forest transition-all"
+                               value={searchQuery}
+                               onChange={(e) => setSearchQuery(e.target.value)}
+                             />
                           </div>
+                          <button 
+                            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                            className={`p-4 rounded-2xl transition-all relative flex-shrink-0 ${
+                              showAdvancedFilters || selectedCategory !== 'all' || inStockOnly || selectedCertifications.length > 0 || priceRange[0] > 0 || priceRange[1] < 10000
+                                ? 'bg-forest text-white shadow-lg shadow-forest/20' 
+                                : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                            }`}
+                            title="ফিল্টার"
+                          >
+                            <SlidersHorizontal className="w-6 h-6" />
+                            {(selectedCategory !== 'all' || inStockOnly || selectedCertifications.length > 0 || priceRange[0] > 0 || priceRange[1] < 10000) && !showAdvancedFilters && (
+                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white font-bold">
+                                !
+                              </div>
+                            )}
+                          </button>
+                       </div>
 
                         <AnimatePresence>
                           {showAdvancedFilters && (
@@ -3398,7 +3421,42 @@ export default function App() {
                               exit={{ height: 0, opacity: 0 }}
                               className="w-full overflow-hidden"
                             >
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-slate-100">
+                              <div className="flex flex-col gap-8 pt-6 border-t border-slate-100">
+                                {/* Categories Section */}
+                                <div className="space-y-4">
+                                  <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                    <Leaf className="w-4 h-4 text-forest" /> ক্যাটাগরি
+                                  </h4>
+                                  <div className="flex flex-wrap gap-2">
+                                    {CATEGORIES.map(cat => (
+                                      <button
+                                        key={cat.id}
+                                        onClick={() => setSelectedCategory(cat.id)}
+                                        className={`px-4 py-2 rounded-xl font-bold transition-all text-xs ${
+                                          selectedCategory === cat.id 
+                                            ? 'bg-forest text-white shadow-md' 
+                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                        }`}
+                                      >
+                                        {cat.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                </div>
+
+                                <div className="flex flex-col items-center gap-4">
+                                  {(searchQuery || selectedCategory !== 'all' || inStockOnly || selectedCertifications.length > 0 || priceRange[0] > 0 || priceRange[1] < 10000) && (
+                                    <button 
+                                      onClick={resetFilters}
+                                      className="flex items-center gap-2 text-red-500 font-bold hover:underline py-2 text-sm"
+                                    >
+                                      <RefreshCw className="w-4 h-4" /> ফিল্টার মুছুন
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-4 border-t border-slate-50 pt-6">
                                 {/* Price Range */}
                                 <div className="space-y-4">
                                   <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
@@ -3489,11 +3547,11 @@ export default function App() {
                         </AnimatePresence>
                       </div>
                    </div>
-                </div>
+                
 
                 {/* Product Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-8">
-                  {filteredProducts.map((product) => (
+                  {filteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((product) => (
                     <motion.div 
                       key={product.id}
                       layout
@@ -3562,6 +3620,59 @@ export default function App() {
                     </motion.div>
                   ))}
                 </div>
+
+                {/* Pagination Controls */}
+                {filteredProducts.length > ITEMS_PER_PAGE && (
+                  <div className="mt-12 flex items-center justify-center gap-4">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="p-3 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition-all"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    
+                    <div className="flex items-center gap-2">
+                      {[...Array(Math.ceil(filteredProducts.length / ITEMS_PER_PAGE))].map((_, i) => {
+                        const page = i + 1;
+                        // Only show first, last, and pages near current page
+                        if (
+                          page === 1 || 
+                          page === Math.ceil(filteredProducts.length / ITEMS_PER_PAGE) || 
+                          (page >= currentPage - 1 && page <= currentPage + 1)
+                        ) {
+                          return (
+                            <button
+                              key={page}
+                              onClick={() => setCurrentPage(page)}
+                              className={`w-10 h-10 rounded-xl font-bold transition-all text-sm ${
+                                currentPage === page 
+                                  ? 'bg-forest text-white shadow-lg' 
+                                  : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          );
+                        } else if (
+                          (page === 2 && currentPage > 3) || 
+                          (page === Math.ceil(filteredProducts.length / ITEMS_PER_PAGE) - 1 && currentPage < Math.ceil(filteredProducts.length / ITEMS_PER_PAGE) - 2)
+                        ) {
+                          return <span key={page} className="text-slate-300">...</span>;
+                        }
+                        return null;
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredProducts.length / ITEMS_PER_PAGE), prev + 1))}
+                      disabled={currentPage === Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)}
+                      className="p-3 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-500 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition-all"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
 
                 {filteredProducts.length === 0 && (
                   <div className="text-center py-32 bg-white rounded-[3rem] border border-slate-100 shadow-sm">
@@ -3959,13 +4070,20 @@ export default function App() {
 
                 {cart.length > 0 && (
                   <div className="border-t border-slate-100 p-5 md:p-8 bg-white/80 backdrop-blur-md sticky bottom-0 z-20 shrink-0 shadow-[-20px_0_40px_rgba(0,0,0,0.05)]">
-                      <div className="flex justify-between items-center text-base font-bold text-slate-900 mb-2">
-                        <p className="text-slate-500">মোট পরিমাণ</p>
-                        <p className="text-forest text-2xl font-black">৳{cartTotal}</p>
+                      <div className="space-y-2 mb-6">
+                        <div className="flex justify-between items-center text-sm font-bold text-slate-500">
+                          <p>সাব-টোটাল</p>
+                          <p className="text-slate-900 font-black">৳{cartTotal}</p>
+                        </div>
+                        <div className="flex justify-between items-center text-sm font-bold text-slate-500">
+                          <p>ডেলিভারি চার্জ</p>
+                          <p className="text-forest font-black">+ ৳{calculateDelivery()}</p>
+                        </div>
+                        <div className="flex justify-between items-center text-xl font-black text-slate-900 border-t border-slate-100 pt-3">
+                          <p>সর্বমোট</p>
+                          <p className="text-forest text-2xl font-black">৳{cartTotal + calculateDelivery()}</p>
+                        </div>
                       </div>
-                      <p className="text-[10px] text-slate-400 mb-6 font-medium italic border-l-2 border-forest/30 pl-3">
-                        শপিং ব্যাগ এর মোট টাকা। ডেলিভারি চার্জ চেকআউটে যুক্ত হবে।
-                      </p>
                       <button
                         onClick={() => {
                           setCheckingOutProduct(null); 
